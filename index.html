@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f5f7fb" />
+  <title>Подборка вакансий и заметок по городам</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Системная типографика в духе iOS и защита от горизонтального скролла на мобильных */
+    :root {
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+    }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-text-size-adjust: 100%;
+      overflow-x: hidden;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", system-ui, sans-serif;
+      background-color: #f5f7fb;
+      color: #0f172a;
+      overflow-x: hidden;
+      padding-top: var(--safe-top);
+      padding-bottom: calc(var(--safe-bottom) + 28px);
+      padding-left: var(--safe-left);
+      padding-right: var(--safe-right);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Мягкие карточки и тактильный отклик для тач-экранов */
+    .ios-card {
+      background: #ffffff;
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      box-shadow:
+        0 10px 25px -12px rgba(15, 23, 42, 0.08),
+        0 2px 6px -1px rgba(15, 23, 42, 0.04);
+      transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+                  box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+                  border-color 0.2s ease;
+    }
+
+    .ios-card:active {
+      transform: scale(0.985);
+    }
+
+    .city-tile {
+      min-height: 44px;
+      touch-action: manipulation;
+    }
+
+    .city-tile:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 16px 30px -12px rgba(15, 23, 42, 0.12),
+        0 4px 10px -2px rgba(15, 23, 42, 0.06);
+    }
+
+    .city-tile:active {
+      transform: scale(0.98);
+    }
+
+    /* Плавное появление секции выбранного города */
+    @keyframes fadeSlideUp {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .reveal-section {
+      animation: fadeSlideUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    /* Тост-уведомление в нижней части экрана */
+    .toast-enter {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    .toast-leave {
+      opacity: 0;
+      transform: translate(-50%, 16px);
+      pointer-events: none;
+    }
+
+    /* Перенос длинных URL без разрыва сетки */
+    .url-preview {
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body class="min-h-screen antialiased selection:bg-blue-100 selection:text-blue-900">
+  <!-- Декоративный верхний градиент фона -->
+  <div aria-hidden="true" class="pointer-events-none fixed inset-x-0 top-0 h-72 bg-gradient-to-b from-blue-50/90 via-indigo-50/40 to-transparent -z-10"></div>
+
+  <!-- Основной контейнер страницы -->
+  <div class="mx-auto w-full max-w-4xl px-4 pt-6 sm:px-6 sm:pt-10">
+
+    <!-- Приветственный экран (Hero) -->
+    <header id="hero-section" class="mb-7 sm:mb-9">
+      <div class="ios-card rounded-3xl p-5 sm:p-8">
+        <div class="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-blue-700 mb-4">
+          <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+          </svg>
+          <span>Личная подборка для просмотра</span>
+        </div>
+
+        <h1 class="text-2xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+          Подборка вакансий и заметок по городам
+        </h1>
+
+        <p class="mt-3 text-sm leading-relaxed text-slate-600 sm:text-base max-w-2xl">
+          Нажмите на нужный город ниже, чтобы открыть аккуратный список ссылок из таблицы с моими комментариями, быстрым переходом на hh.ru и отметками о просмотре.
+        </p>
+
+        <!-- Три крупные карточки городов (Санкт-Петербург, Калуга, Тула) -->
+        <div role="group" aria-label="Выбор города" class="mt-6 grid grid-cols-1 gap-3.5 sm:grid-cols-3 sm:gap-4">
+          <!-- Санкт-Петербург -->
+          <button
+            type="button"
+            data-city-btn="spb"
+            onclick="selectCity('spb')"
+            class="city-tile ios-card group relative flex flex-col justify-between rounded-2xl p-4 sm:p-5 text-left cursor-pointer border-2 border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          >
+            <div class="flex items-start justify-between gap-2">
+              <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 shrink-0">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M3 21h18"></path>
+                  <path d="M5 21V7l7-4 7 4v14"></path>
+                  <path d="M9 21v-6h6v6"></path>
+                </svg>
+              </span>
+              <span data-badge-count="spb" class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                2 ссылки
+              </span>
+            </div>
+
+            <div class="mt-4">
+              <div class="text-lg font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
+                Санкт-Петербург
+              </div>
+              <div class="mt-1 flex items-center justify-between text-xs text-slate-500">
+                <span data-badge-progress="spb">Отмечено: 0 из 2</span>
+                <span class="font-semibold text-blue-600 inline-flex items-center gap-1">
+                  Открыть
+                  <svg class="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9 18l6-6-6-6"></path>
+                  </svg>
+                </span>
+              </div>
+            </div>
+          </button>
+
+          <!-- Калуга -->
+          <button
+            type="button"
+            data-city-btn="kaluga"
+            onclick="selectCity('kaluga')"
+            class="city-tile ios-card group relative flex flex-col justify-between rounded-2xl p-4 sm:p-5 text-left cursor-pointer border-2 border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          >
+            <div class="flex items-start justify-between gap-2">
+              <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 shrink-0">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                  <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+              </span>
+              <span data-badge-count="kaluga" class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                3 ссылки
+              </span>
+            </div>
+
+            <div class="mt-4">
+              <div class="text-lg font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
+                Калуга
+              </div>
+              <div class="mt-1 flex items-center justify-between text-xs text-slate-500">
+                <span data-badge-progress="kaluga">Отмечено: 0 из 3</span>
+                <span class="font-semibold text-blue-600 inline-flex items-center gap-1">
+                  Открыть
+                  <svg class="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9 18l6-6-6-6"></path>
+                  </svg>
+                </span>
+              </div>
+            </div>
+          </button>
+
+          <!-- Тула -->
+          <button
+            type="button"
+            data-city-btn="tula"
+            onclick="selectCity('tula')"
+            class="city-tile ios-card group relative flex flex-col justify-between rounded-2xl p-4 sm:p-5 text-left cursor-pointer border-2 border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          >
+            <div class="flex items-start justify-between gap-2">
+              <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 shrink-0">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                  <path d="M2 17l10 5 10-5"></path>
+                  <path d="M2 12l10 5 10-5"></path>
+                </svg>
+              </span>
+              <span data-badge-count="tula" class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                5 ссылок
+              </span>
+            </div>
+
+            <div class="mt-4">
+              <div class="text-lg font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
+                Тула
+              </div>
+              <div class="mt-1 flex items-center justify-between text-xs text-slate-500">
+                <span data-badge-progress="tula">Отмечено: 0 из 5</span>
+                <span class="font-semibold text-blue-600 inline-flex items-center gap-1">
+                  Открыть
+                  <svg class="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9 18l6-6-6-6"></path>
+                  </svg>
+                </span>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Липкая панель быстрого переключения между городами при просмотре списка -->
+    <nav id="sticky-city-bar" aria-label="Быстрое переключение между городами" class="hidden sticky top-2 z-30 mb-5">
+      <div class="ios-card rounded-2xl p-1.5 backdrop-blur-md bg-white/95 border border-slate-200/80 shadow-md">
+        <div class="flex items-center justify-between gap-1.5">
+          <button
+            type="button"
+            onclick="scrollToHero()"
+            aria-label="К выбору города"
+            class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100 active:scale-95 transition cursor-pointer shrink-0"
+          >
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 15l-6-6-6 6"></path>
+            </svg>
+          </button>
+
+          <div class="grid flex-1 grid-cols-3 gap-1">
+            <button
+              type="button"
+              data-tab-city="spb"
+              onclick="selectCity('spb', true)"
+              class="min-h-[44px] px-2 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer truncate"
+            >
+              СПб (2)
+            </button>
+            <button
+              type="button"
+              data-tab-city="kaluga"
+              onclick="selectCity('kaluga', true)"
+              class="min-h-[44px] px-2 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer truncate"
+            >
+              Калуга (3)
+            </button>
+            <button
+              type="button"
+              data-tab-city="tula"
+              onclick="selectCity('tula', true)"
+              class="min-h-[44px] px-2 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer truncate"
+            >
+              Тула (5)
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Область динамического просмотра выбранного города -->
+    <main id="city-workspace" aria-live="polite">
+      <!-- Состояние до выбора города -->
+      <div id="empty-state" class="ios-card rounded-3xl p-6 sm:p-8 text-center">
+        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 mb-3">
+          <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"></path>
+          </svg>
+        </div>
+        <h2 class="text-base sm:text-lg font-semibold text-slate-800">
+          Выберите город выше, чтобы открыть список объявлений
+        </h2>
+        <p class="mt-1.5 text-sm text-slate-500 max-w-md mx-auto">
+          В каждом городе вас ждут сохранённые ссылки на вакансии, личные комментарии и удобные кнопки для открытия или копирования.
+        </p>
+      </div>
+
+      <!-- Контейнер карточек выбранного города -->
+      <section id="city-detail-section" class="hidden"></section>
+    </main>
+  </div>
+
+  <!-- Тост-уведомление для обратной связи при копировании -->
+  <div
+    id="toast-banner"
+    role="status"
+    aria-live="polite"
+    class="toast-leave fixed bottom-6 left-1/2 z-50 flex items-center gap-2 rounded-full bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-xl transition-all duration-200"
+  >
+    <svg class="h-4 w-4 text-emerald-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+    <span id="toast-message">Скопировано</span>
+  </div>
+
+  <script>
+    /**
+     * Точные данные из Excel-файла «Лист Microsoft Office Excel (2).xlsx» (лист «Лист1»).
+     * Порядок городов на приветственном экране: Санкт-Петербург, Калуга, Тула.
+     */
+    const CITIES_DATA = {
+      spb: {
+        id: 'spb',
+        name: 'Санкт-Петербург',
+        shortTab: 'СПб',
+        subtitle: 'Сохранённые вакансии и заметки по Санкт-Петербургу',
+        accentClasses: {
+          pillBg: 'bg-sky-100',
+          pillText: 'text-sky-800',
+          noteBorder: 'border-sky-400',
+          noteBg: 'bg-sky-50/70'
+        },
+        items: [
+          {
+            id: 'spb-1',
+            number: 1,
+            comment: 'Ну икона',
+            url: 'https://tula.hh.ru/vacancy/134884108?query=%D0%9C%D0%B5%D0%BD%D0%B5%D0%B4%D0%B6%D0%B5%D1%80+%D0%BF%D0%BE+%D0%BF%D1%80%D0%BE%D0%B4%D0%B0%D0%B6%D0%B0%D0%BC&hhtmFrom=vacancy_search_list'
+          },
+          {
+            id: 'spb-2',
+            number: 2,
+            comment: 'С этим городом все понятно ( Работы много, есть и чего выбрать)',
+            url: 'https://tula.hh.ru/vacancy/139153049?query=%D0%9C%D0%B5%D0%BD%D0%B5%D0%B4%D0%B6%D0%B5%D1%80+%D0%BF%D0%BE+%D0%BF%D1%80%D0%BE%D0%B4%D0%B0%D0%B6%D0%B0%D0%BC&hhtmFrom=vacancy_search_list'
+          }
+        ]
+      },
+      kaluga: {
+        id: 'kaluga',
+        name: 'Калуга',
+        shortTab: 'Калуга',
+        subtitle: 'Сохранённые вакансии и заметки по Калуге',
+        accentClasses: {
+          pillBg: 'bg-emerald-100',
+          pillText: 'text-emerald-800',
+          noteBorder: 'border-emerald-400',
+          noteBg: 'bg-emerald-50/70'
+        },
+        items: [
+          {
+            id: 'kaluga-1',
+            number: 1,
+            comment: 'Есть потенциал, но нужно узнать оклад',
+            url: 'https://tula.hh.ru/vacancy/139673321?query=%D0%9C%D0%B5%D0%BD%D0%B5%D0%B4%D0%B6%D0%B5%D1%80+%D0%BF%D0%BE+%D0%BF%D1%80%D0%BE%D0%B4%D0%B0%D0%B6%D0%B0%D0%BC&hhtmFrom=vacancy_search_list'
+          },
+          {
+            id: 'kaluga-2',
+            number: 2,
+            comment: 'Интересный формат',
+            url: 'https://tula.hh.ru/vacancy/139322073?query=%D0%9C%D0%B5%D0%BD%D0%B5%D0%B4%D0%B6%D0%B5%D1%80+%D0%BF%D0%BE+%D0%BF%D1%80%D0%BE%D0%B4%D0%B0%D0%B6%D0%B0%D0%BC&hhtmFrom=vacancy_search_list'
+          },
+          {
+            id: 'kaluga-3',
+            number: 3,
+            comment: 'Для пополнения списка, тоже как вариант, если по отзывам норм',
+            url: 'https://tula.hh.ru/vacancy/138787827?query=%D0%9C%D0%B5%D0%BD%D0%B5%D0%B4%D0%B6%D0%B5%D1%80+%D0%BF%D0%BE+%D0%BF%D1%80%D0%BE%D0%B4%D0%B0%D0%B6%D0%B0%D0%BC&hhtmFrom=vacancy_search_list'
+          }
+        ]
+      },
+      tula: {
+        id: 'tula',
+        name: 'Тула',
+        shortTab: 'Тула',
+        subtitle: 'Сохранённые вакансии и заметки по Туле',
+        accentClasses: {
+          pillBg: 'bg-amber-100',
+          pillText: 'text-amber-800',
+          noteBorder: 'border-amber-400',
+          noteBg: 'bg-amber-50/75'
+        },
+        items: [
+          {
+            id: 'tula-1',
+            number: 1,
+            comment: 'Указан оклад, есть отзывы (лучше посмотри их), выплата 2 раза в месяц и есть оформление по ГПХ с физ лицами',
+            url: 'https://tula.hh.ru/vacancy/139046132?utm_medium=cpc_hh&utm_source=clickmehhru&utm_campaign=1376607&utm_local_campaign=1888133&utm_content=1427024'
+          },
+          {
+            id: 'tula-2',
+            number: 2,
+            comment: 'Классика, надо проверить хз что в отзывах',
+            url: 'https://tula.hh.ru/vacancy/139629465?query=%D0%BC%D0%B5%D0%BD%D0%B5%D0%B4%D0%B6%D0%B5%D1%80+%D0%BF%D0%BE+%D0%BF%D1%80%D0%BE%D0%B4%D0%B0%D0%B6%D0%B0%D0%BC&hhtmFrom=vacancy_search_list'
+          },
+          {
+            id: 'tula-3',
+            number: 3,
+            comment: 'Супер просто, но нет вау-эффекта',
+            url: 'https://tula.hh.ru/vacancy/139613120?query=%D0%BC%D0%B5%D0%BD%D0%B5%D0%B4%D0%B6%D0%B5%D1%80+%D0%BF%D0%BE+%D0%BF%D1%80%D0%BE%D0%B4%D0%B0%D0%B6%D0%B0%D0%BC&hhtmFrom=vacancy_search_list'
+          },
+          {
+            id: 'tula-4',
+            number: 4,
+            comment: 'Вот это вау, но не понятно, что продают',
+            url: 'https://tula.hh.ru/vacancy/139411276?query=%D0%BC%D0%B5%D0%BD%D0%B5%D0%B4%D0%B6%D0%B5%D1%80+%D0%BF%D0%BE+%D0%BF%D1%80%D0%BE%D0%B4%D0%B0%D0%B6%D0%B0%D0%BC&hhtmFrom=vacancy_search_list'
+          },
+          {
+            id: 'tula-5',
+            number: 5,
+            comment: 'У них есть: холодильник, чай, сахар и вода',
+            url: 'https://tula.hh.ru/vacancy/139767410?query=%D0%BC%D0%B5%D0%BD%D0%B5%D0%B4%D0%B6%D0%B5%D1%80+%D0%BF%D0%BE+%D0%BF%D1%80%D0%BE%D0%B4%D0%B0%D0%B6%D0%B0%D0%BC&hhtmFrom=vacancy_search_list'
+          }
+        ]
+      }
+    };
+
+    const STORAGE_KEY = 'city_vacancies_checked_v1';
+    let activeCityId = null;
+    let toastTimer = null;
+
+    /**
+     * Безопасно читает отмеченные карточки из localStorage.
+     */
+    function loadCheckedMap() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        return typeof parsed === 'object' && parsed !== null ? parsed : {};
+      } catch (err) {
+        return {};
+      }
+    }
+
+    /**
+     * Безопасно сохраняет отмеченные карточки в localStorage.
+     */
+    function saveCheckedMap(map) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+      } catch (err) {
+        // Игнорируем ошибки квоты или приватного режима Safari
+      }
+    }
+
+    let checkedMap = loadCheckedMap();
+
+    /**
+     * Экранирует спецсимволы HTML для безопасной вставки строк.
+     */
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    /**
+     * Извлекает домен и ID вакансии из ссылки hh.ru для компактного отображения.
+     */
+    function parseVacancyMeta(url) {
+      try {
+        const parsed = new URL(url);
+        const match = parsed.pathname.match(/\/vacancy\/(\d+)/);
+        const vacancyId = match ? match[1] : null;
+        return {
+          host: parsed.hostname,
+          vacancyId: vacancyId
+        };
+      } catch (err) {
+        return {
+          host: 'hh.ru',
+          vacancyId: null
+        };
+      }
+    }
+
+    /**
+     * Склонение слова «ссылка» для русского языка.
+     */
+    function pluralLinks(count) {
+      const mod10 = count % 10;
+      const mod100 = count % 100;
+      if (mod10 === 1 && mod100 !== 11) return `${count} ссылка`;
+      if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return `${count} ссылки`;
+      return `${count} ссылок`;
+    }
+
+    /**
+     * Обновляет счётчики отмеченных вакансий на карточках городов и в шапке секции.
+     */
+    function updateCityProgressBadges() {
+      Object.keys(CITIES_DATA).forEach((cityKey) => {
+        const city = CITIES_DATA[cityKey];
+        const total = city.items.length;
+        const done = city.items.filter((item) => Boolean(checkedMap[item.id])).length;
+
+        const progressEl = document.querySelector(`[data-badge-progress="${cityKey}"]`);
+        if (progressEl) {
+          progressEl.textContent = `Отмечено: ${done} из ${total}`;
+        }
+
+        const countEl = document.querySelector(`[data-badge-count="${cityKey}"]`);
+        if (countEl) {
+          countEl.textContent = pluralLinks(total);
+        }
+      });
+
+      const sectionCounter = document.getElementById('active-city-progress');
+      if (sectionCounter && activeCityId && CITIES_DATA[activeCityId]) {
+        const city = CITIES_DATA[activeCityId];
+        const total = city.items.length;
+        const done = city.items.filter((item) => Boolean(checkedMap[item.id])).length;
+        sectionCounter.textContent = `Отмечено: ${done} из ${total}`;
+      }
+    }
+
+    /**
+     * Подсвечивает выбранный город в приветственном блоке и в липкой панели переключения.
+     */
+    function updateActiveIndicators(cityId) {
+      document.querySelectorAll('[data-city-btn]').forEach((btn) => {
+        const isSelected = btn.getAttribute('data-city-btn') === cityId;
+        btn.classList.toggle('border-blue-600', isSelected);
+        btn.classList.toggle('ring-2', isSelected);
+        btn.classList.toggle('ring-blue-500/20', isSelected);
+        btn.classList.toggle('border-transparent', !isSelected);
+      });
+
+      document.querySelectorAll('[data-tab-city]').forEach((tab) => {
+        const isSelected = tab.getAttribute('data-tab-city') === cityId;
+        tab.classList.toggle('bg-blue-600', isSelected);
+        tab.classList.toggle('text-white', isSelected);
+        tab.classList.toggle('shadow-sm', isSelected);
+        tab.classList.toggle('text-slate-700', !isSelected);
+        tab.classList.toggle('hover:bg-slate-100', !isSelected);
+      });
+    }
+
+    /**
+     * Рендерит список карточек объявлений для выбранного города.
+     */
+    function renderCitySection(cityId) {
+      const city = CITIES_DATA[cityId];
+      if (!city) return;
+
+      const sectionEl = document.getElementById('city-detail-section');
+      const emptyEl = document.getElementById('empty-state');
+      const stickyBar = document.getElementById('sticky-city-bar');
+
+      emptyEl.classList.add('hidden');
+      stickyBar.classList.remove('hidden');
+      sectionEl.classList.remove('hidden');
+
+      // Перезапускаем анимацию появления
+      sectionEl.classList.remove('reveal-section');
+      void sectionEl.offsetWidth;
+      sectionEl.classList.add('reveal-section');
+
+      const total = city.items.length;
+      const done = city.items.filter((item) => Boolean(checkedMap[item.id])).length;
+
+      const cardsHtml = city.items.map((item) => {
+        const isChecked = Boolean(checkedMap[item.id]);
+        const meta = parseVacancyMeta(item.url);
+        const idBadgeHtml = meta.vacancyId
+          ? `<span class="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Вакансия #${escapeHtml(meta.vacancyId)}</span>`
+          : '';
+
+        return `
+          <article
+            id="card-${escapeHtml(item.id)}"
+            class="ios-card rounded-3xl p-4 sm:p-6 transition-opacity ${isChecked ? 'opacity-80' : 'opacity-100'}"
+          >
+            <!-- Верхняя строка: номер, город, ID вакансии и переключатель «Проверено» -->
+            <div class="flex flex-wrap items-center justify-between gap-2.5">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="inline-flex h-7 min-w-[28px] items-center justify-center rounded-full bg-slate-900 px-2 text-xs font-bold text-white">
+                  №${item.number}
+                </span>
+                <span class="inline-flex items-center rounded-full ${city.accentClasses.pillBg} ${city.accentClasses.pillText} px-3 py-1 text-xs font-semibold">
+                  ${escapeHtml(city.name)}
+                </span>
+                ${idBadgeHtml}
+              </div>
+
+              <label class="inline-flex min-h-[44px] items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  ${isChecked ? 'checked' : ''}
+                  onchange="toggleItemChecked('${escapeHtml(item.id)}', this.checked)"
+                  class="h-5 w-5 rounded-md border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500/40 cursor-pointer"
+                />
+                <span>${isChecked ? 'Проверено' : 'Отметить'}</span>
+              </label>
+            </div>
+
+            <!-- Блок с личным комментарием пользователя -->
+            <div class="mt-3.5 rounded-2xl border-l-4 ${city.accentClasses.noteBorder} ${city.accentClasses.noteBg} p-3.5 sm:p-4">
+              <div class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">
+                <svg class="h-3.5 w-3.5 text-slate-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span>Комментарий</span>
+              </div>
+              <p class="text-sm sm:text-base font-medium leading-relaxed text-slate-900 ${isChecked ? 'line-through decoration-slate-400 text-slate-600' : ''}">
+                ${escapeHtml(item.comment)}
+              </p>
+            </div>
+
+            <!-- Компактная строка с доменом и полным адресом объявления -->
+            <div class="mt-3.5 rounded-xl bg-slate-50 border border-slate-200/70 px-3 py-2.5">
+              <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                Источник: ${escapeHtml(meta.host)}
+              </div>
+              <div class="url-preview mt-0.5 text-xs text-slate-500">
+                ${escapeHtml(item.url)}
+              </div>
+            </div>
+
+            <!-- Кнопки действий (крупные тач-зоны под палец на iPhone) -->
+            <div class="mt-4 flex flex-col gap-2.5 sm:flex-row sm:items-center">
+              <a
+                href="${escapeHtml(item.url)}"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex min-h-[46px] flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-[0.99] transition"
+              >
+                <span>Открыть объявление на hh.ru</span>
+                <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+              </a>
+
+              <button
+                type="button"
+                onclick="copyVacancyLink('${escapeHtml(item.url)}')"
+                class="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-200/80 active:scale-[0.99] transition cursor-pointer sm:w-auto"
+              >
+                <svg class="h-4 w-4 shrink-0 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span>Копировать ссылку</span>
+              </button>
+            </div>
+          </article>
+        `;
+      }).join('');
+
+      sectionEl.innerHTML = `
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
+          <div>
+            <div class="flex items-center gap-2.5">
+              <h2 class="text-xl sm:text-2xl font-bold text-slate-900">
+                ${escapeHtml(city.name)}
+              </h2>
+              <span class="inline-flex items-center rounded-full bg-white border border-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                ${pluralLinks(total)}
+              </span>
+            </div>
+            <p class="mt-0.5 text-xs sm:text-sm text-slate-500">
+              ${escapeHtml(city.subtitle)}
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span id="active-city-progress" class="rounded-full bg-white border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
+              Отмечено: ${done} из ${total}
+            </span>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          ${cardsHtml}
+        </div>
+      `;
+    }
+
+    /**
+     * Переключает выбранный город и при необходимости плавно прокручивает к списку.
+     */
+    function selectCity(cityId, fromStickyTab = false) {
+      if (!CITIES_DATA[cityId]) return;
+      activeCityId = cityId;
+
+      updateActiveIndicators(cityId);
+      renderCitySection(cityId);
+      updateCityProgressBadges();
+
+      const sectionEl = document.getElementById('city-detail-section');
+      if (sectionEl) {
+        const yOffset = fromStickyTab ? -72 : -16;
+        const targetY = sectionEl.getBoundingClientRect().top + window.scrollY + yOffset;
+        window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+      }
+    }
+
+    /**
+     * Возвращает пользователя наверх к приветственному экрану.
+     */
+    function scrollToHero() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    /**
+     * Переключает отметку «Проверено» для карточки и сохраняет состояние.
+     */
+    function toggleItemChecked(itemId, isChecked) {
+      checkedMap[itemId] = Boolean(isChecked);
+      saveCheckedMap(checkedMap);
+      updateCityProgressBadges();
+
+      if (activeCityId) {
+        renderCitySection(activeCityId);
+      }
+    }
+
+    /**
+     * Показывает короткое тост-уведомление внизу экрана.
+     */
+    function showToast(message) {
+      const toastEl = document.getElementById('toast-banner');
+      const msgEl = document.getElementById('toast-message');
+      if (!toastEl || !msgEl) return;
+
+      msgEl.textContent = message;
+      toastEl.classList.remove('toast-leave');
+      toastEl.classList.add('toast-enter');
+
+      if (toastTimer) {
+        clearTimeout(toastTimer);
+      }
+
+      toastTimer = setTimeout(() => {
+        toastEl.classList.remove('toast-enter');
+        toastEl.classList.add('toast-leave');
+      }, 2200);
+    }
+
+    /**
+     * Копирует ссылку в буфер обмена с поддержкой iOS Safari и fallback через execCommand.
+     */
+    function copyVacancyLink(url) {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(url).then(
+          () => showToast('Скопировано'),
+          () => fallbackCopy(url)
+        );
+      } else {
+        fallbackCopy(url);
+      }
+    }
+
+    function fallbackCopy(text) {
+      try {
+        const tempInput = document.createElement('textarea');
+        tempInput.value = text;
+        tempInput.setAttribute('readonly', '');
+        tempInput.style.position = 'fixed';
+        tempInput.style.top = '-9999px';
+        tempInput.style.left = '-9999px';
+        document.body.appendChild(tempInput);
+
+        // Выделение диапазона работает надёжно в iOS Safari
+        const range = document.createRange();
+        range.selectNodeContents(tempInput);
+        const selection = window.getSelection();
+        if (selection) {
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+        tempInput.select();
+        tempInput.setSelectionRange(0, tempInput.value.length);
+
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        showToast('Скопировано');
+      } catch (err) {
+        showToast('Не удалось скопировать');
+      }
+    }
+
+    // Инициализация счётчиков при загрузке страницы
+    document.addEventListener('DOMContentLoaded', () => {
+      updateCityProgressBadges();
+    });
+  </script>
+</body>
+</html>
